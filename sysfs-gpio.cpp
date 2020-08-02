@@ -1,10 +1,19 @@
 #include <stdarg.h>
+#include <unistd.h>
+#include <string.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <stdlib.h>
 #include <cl3/core/io_file.hpp>
 #include "sysfs-gpio.hpp"
 
 using namespace cl3::io::stream::fd;
 using namespace cl3::io::text;
+using namespace cl3::io::file;
 using namespace cl3::io::text::string;
+
+#define SYSERR(expr) (([&](){ const auto r = ((expr)); if( (long)r == -1L ) { throw #expr; } else return r; })())
 
 namespace gpio
 {
@@ -23,11 +32,11 @@ namespace gpio
 
 			va_end(l);
 
-			const int fd = CL3_NONCLASS_SYSERR(open(__file, O_WRONLY|O_CLOEXEC|O_NOCTTY|O_SYNC));
+			const int fd = SYSERR(open(__file, O_WRONLY|O_CLOEXEC|O_NOCTTY|O_SYNC));
 			try
 			{
 				const ssize_t len = strnlen(__data, sizeof(__data));
-				if(CL3_NONCLASS_SYSERR(write(fd, __data, len)) != len)
+				if(SYSERR(write(fd, __data, len)) != len)
 					throw "write failed";
 			}
 			catch(...)
@@ -55,10 +64,10 @@ namespace gpio
 
 			switch(m)
 			{
-				case ETrigger::INPUT:
+				case EMode::INPUT:
 					WriteFile("/sys/class/gpio/gpio%u/mode", "in", this->id);
 					break;
-				case ETrigger::OUTPUT:
+				case EMode::OUTPUT:
 					WriteFile("/sys/class/gpio/gpio%u/mode", "out", this->id);
 					break;
 			}
@@ -105,7 +114,7 @@ namespace gpio
 			this->trigger = t;
 		}
 
-		TWaitable OnTrigger() const
+		TWaitable TPin::OnTrigger() const
 		{
 			return this->f_value.FD().OnInputReady();
 		}
@@ -115,9 +124,12 @@ namespace gpio
 			WriteFile("/sys/class/gpio/unexport", "%u", this->id);
 		}
 
-		TPin::TPin(const u32_t id)
+		TPin::TPin(const u32_t id) : id(id), mode(EMode::INPUT), trigger(ETrigger::NONE)
 		{
 			WriteFile("/sys/class/gpio/export", "%u", this->id);
+			WriteFile("/sys/class/gpio/gpio%u/direction", "in", this->id);
+			WriteFile("/sys/class/gpio/gpio%u/edge", "none", this->id);
+			this->f_value = TFile(TString("/sys/class/gpio/gpio") + id + "/value", TAccess::RW);
 		}
 
 		TList<u32_t> TController::AvailablePins() const
@@ -126,11 +138,11 @@ namespace gpio
 
 			memset(buffer, 0, sizeof(buffer));
 			TFile(this->sysfs_path + "base").Read(0, buffer, sizeof(buffer) - 1);
-			const u32_t base = (u32_t)strtoul(buffer);
+			const u32_t base = (u32_t)atol((const char*)buffer);
 
 			memset(buffer, 0, sizeof(buffer));
 			TFile(this->sysfs_path + "ngpio").Read(0, buffer, sizeof(buffer) - 1);
-			const u32_t ngpio = (u32_t)strtoul(buffer);
+			const u32_t ngpio = (u32_t)atol((const char*)buffer);
 
 			TList<u32_t> ids;
 			for(u32_t i = 0; i < ngpio; i++)

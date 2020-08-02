@@ -7,6 +7,7 @@
 namespace gpio
 {
 	using namespace cl3::io::collection::list;
+	using namespace cl3::system::types;
 
 	enum class EMode
 	{
@@ -31,7 +32,7 @@ namespace gpio
 		virtual ETrigger Trigger() const CL3_GETTER = 0;
 		virtual void Trigger(ETrigger) CL3_SETTER = 0;
 		virtual cl3::io::stream::fd::TWaitable OnTrigger() const = 0;
-		virtual ~IPin();
+		virtual ~IPin() {}
 	};
 
 	struct IController
