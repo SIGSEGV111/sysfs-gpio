@@ -65,10 +65,10 @@ namespace gpio
 			switch(m)
 			{
 				case EMode::INPUT:
-					WriteFile("/sys/class/gpio/gpio%u/mode", "in", this->id);
+					WriteFile("/sys/class/gpio/gpio%u/direction", "in", this->id);
 					break;
 				case EMode::OUTPUT:
-					WriteFile("/sys/class/gpio/gpio%u/mode", "out", this->id);
+					WriteFile("/sys/class/gpio/gpio%u/direction", "out", this->id);
 					break;
 			}
 
